@@ -1,128 +1,173 @@
 # SM2 CoSign Lab
 
-SM2 CoSign Lab 是一个基于 SM2/SM3 的多方协同数字签名与验签演示平台，包含 C 后端、Web 前端与严格 GMSSL 3.x 适配层。
+<p align="center">
+  <a href="https://github.com/securitysheep/sm2-cosign-lab/stargazers"><img src="https://img.shields.io/github/stars/securitysheep/sm2-cosign-lab?style=flat-square" alt="stars"></a>
+  <a href="https://github.com/securitysheep/sm2-cosign-lab/network/members"><img src="https://img.shields.io/github/forks/securitysheep/sm2-cosign-lab?style=flat-square" alt="forks"></a>
+  <a href="https://github.com/securitysheep/sm2-cosign-lab/blob/main/LICENSE"><img src="https://img.shields.io/github/license/securitysheep/sm2-cosign-lab?style=flat-square" alt="license"></a>
+  <a href="https://github.com/securitysheep/sm2-cosign-lab/commits/main"><img src="https://img.shields.io/github/last-commit/securitysheep/sm2-cosign-lab?style=flat-square" alt="last-commit"></a>
+</p>
 
-English tagline: A practical SM2 multi-party co-signature demo with modular C backend and GMSSL 3.x compatibility.
+一个基于 SM2 与 SM3 的多方协同数字签名与验签演示平台，提供 C 后端、Web 前端、模块化接口层与 GMSSL 3.x 适配。
 
-## 推荐仓库名
+English: A practical SM2 multi-party collaborative signature demo with modular C backend and strict GMSSL 3.x adaptation.
 
-主推荐：sm2-cosign-lab
+## 目录
 
-备选：
-- sm2-multiparty-signature-lab
-- gmssl-sm2-collab-sign-demo
+- 项目亮点
+- 适用场景
+- 快速开始
+- 接口一览
+- 项目结构
+- 文档导航
+- 开发路线图
+- GitHub 首页信息填写建议
+- 常见问题
+- 贡献指南
+- 许可证
 
-## 核心能力
+## 项目亮点
 
-- 多方协同签名完整流程：初始化、组公钥生成、签名、验签
-- endpoint 模块化：init/group/sign/verify 独立实现
-- 统一请求体处理与错误返回，支持 body 超限保护
-- 健康检查接口与自动化回归脚本
-- 严格 GMSSL 3.x 适配层，便于迁移与替换
+- 端到端协同签名链路：初始化、组公钥生成、签名、验签
+- endpoint 拆分清晰：init、group、sign、verify 独立实现
+- 统一请求体处理与错误响应，包含请求体大小限制保护
+- 健康检查与自动化回归脚本，便于持续验证
+- GMSSL 3.x 适配层与业务解耦，降低密码库升级成本
 
-## 目录结构
+## 适用场景
 
-```text
+- 密码学教学与实验课程演示
+- 多方协作签名流程验证与 PoC
+- SM2 协同签名后端接口化实践
+
+## 快速开始
+
+### 1) 环境依赖
+
+macOS:
+
+~~~bash
+brew install jansson libmicrohttpd gmssl
+~~~
+
+说明：默认优先使用系统或 Homebrew 动态库，不建议直接依赖仓库中历史静态库。
+
+### 2) 构建
+
+~~~bash
+make clean
+make
+~~~
+
+### 3) 启动后端
+
+~~~bash
+make run
+~~~
+
+默认地址：
+- 服务地址: http://localhost:8888
+- 健康检查: http://localhost:8888/health
+
+### 4) 启动前端
+
+~~~bash
+make run-frontend
+~~~
+
+前端访问: http://localhost:8080/index.html
+
+### 5) 运行回归测试
+
+~~~bash
+make test
+~~~
+
+该命令执行最小链路：init -> gen-group-key -> sign -> verify
+
+## 接口一览
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | /health | 健康检查 |
+| POST | /init | 初始化用户与服务器密钥 |
+| POST | /gen-group-key | 生成组公钥 |
+| POST | /sign | 协同签名 |
+| POST | /verify | 验签 |
+
+完整接口定义见 [docs/api.md](docs/api.md)。
+
+## 项目结构
+
+~~~text
 assets/
-  images/                         # 项目截图、架构图
+  images/                         # 截图和架构图
 docs/
-  api.md                          # 接口说明
-  architecture.md                 # 架构说明
-  github-publish-guide.md         # GitHub 发布与填写模板
-  manual/                         # 原始操作手册
+  api.md
+  architecture.md
+  github-publish-guide.md
+  manual/
 scripts/
-  regression_sm2_flow.sh          # 回归脚本
+  regression_sm2_flow.sh
 src/
   app.c                           # HTTP 服务入口
-  runtime_state.c/.h              # 全局状态与资源生命周期
+  runtime_state.c/.h              # 全局状态管理
   SM2.c/.h                        # SM2 封装
   SM2_Multi_party_collaborative_signature.c/.h
   crypto/
     gmssl3_adapter.c/.h           # GMSSL 3.x 适配层
   endpoints/
-    http_utils.c/.h               # 请求解析与响应封装
+    http_utils.c/.h               # 请求与响应公共组件
     dispatcher.c                  # 路由分发
     init_endpoint.c
     group_endpoint.c
     sign_endpoint.c
     verify_endpoint.c
-```
+~~~
 
-## 环境依赖
+## 文档导航
 
-macOS:
+- API 文档: [docs/api.md](docs/api.md)
+- 架构文档: [docs/architecture.md](docs/architecture.md)
+- 发布指南: [docs/github-publish-guide.md](docs/github-publish-guide.md)
+- 协同签名模块化重构计划: [docs/plans/2026-03-14-backend-modularization.md](docs/plans/2026-03-14-backend-modularization.md)
 
-```bash
-brew install jansson libmicrohttpd gmssl
-```
+## 开发路线图
 
-说明：
-- 默认优先使用系统或 Homebrew 动态库。
-- 不建议直接依赖仓库内 lib 目录中的历史静态库文件。
+- [x] endpoint 模块化拆分
+- [x] GMSSL 3.x 适配层落地
+- [x] 回归脚本与健康检查
+- [ ] GitHub Actions 持续集成
+- [ ] 前端可视化调试面板增强
 
-## 快速开始
+## GitHub 首页信息填写建议
 
-1) 构建
+建议在仓库 About 区域填写：
 
-```bash
-make clean
-make
-```
+- Description:
+  SM2 multi-party co-signature demo with modular C backend, web frontend, and GMSSL 3.x adapter.
+- Topics:
+  sm2, sm3, gmssl, cryptography, digital-signature, multiparty-computation, c, microhttpd, security-demo
 
-2) 启动后端
-
-```bash
-make run
-```
-
-3) 启动前端静态页面
-
-```bash
-make run-frontend
-```
-
-4) 访问地址
-
-- 前端：http://localhost:8080/index.html
-- 后端：http://localhost:8888
-- 健康检查：http://localhost:8888/health
-
-## 回归测试
-
-```bash
-make test
-```
-
-该命令执行最小端到端链路：
-/init -> /gen-group-key -> /sign -> /verify
-
-## 接口与架构文档
-
-- API: docs/api.md
-- Architecture: docs/architecture.md
-
-## GitHub 发布与页面填写
-
-详细步骤和可复制模板见：docs/github-publish-guide.md
+详细模板见 [docs/github-publish-guide.md](docs/github-publish-guide.md)。
 
 ## 常见问题
 
-1. 为什么 sign 可能耗时偏高？
+### 为什么签名阶段可能比普通签名慢？
 
-协同签名过程包含多轮椭圆曲线运算与链式加解密，在调试构建或低性能设备上耗时会更明显。
+协同签名需要多轮椭圆曲线运算与链式加解密，性能开销高于单方签名属于预期行为。
 
-2. 为什么要做 GMSSL 3.x 适配层？
+### 为什么要保留 GMSSL 3.x 适配层？
 
-将核心业务逻辑与具体密码库调用隔离，便于后续升级和替换。
+通过适配层隔离库调用细节，便于后续升级密码库或切换实现。
 
-3. 发布前最少要做什么检查？
+### 上线前最少要做哪些检查？
 
 至少执行一次 make test 并确认回归链路通过。
 
-## Contributing
+## 贡献指南
 
-See CONTRIBUTING.md
+参见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## License
+## 许可证
 
-MIT, see LICENSE
+本项目采用 MIT 许可证，见 [LICENSE](LICENSE)。
