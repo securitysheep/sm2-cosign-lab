@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>基于SM2的多方协同数字签名与验证平台</title>
+    <style>
+        .container { 
+            display: flex; 
+            padding: 20px; 
+            gap: 30px; 
+            position: relative;
+        }
+        .control-panel { 
+            width: 350px; 
+            border-right: 2px solid #ccc; 
+            padding-right: 20px;
+        }
+        .param-container { 
+            flex: 1; 
+            overflow-y: auto; 
+            max-height: 90vh; 
+        }
+        .param-block { 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            padding: 15px; 
+            margin-bottom: 15px;
+            background: #f8f9fa;
+        }
+        .param-block h3 { 
+            color: #2c3e50; 
+            margin-top: 0; 
+            border-bottom: 1px solid #eee; 
+            padding-bottom: 10px; 
+        }
+        .input-group { 
+            margin: 10px 0; 
+            position: relative;
+        }
+        .input-group label { 
+            display: block; 
+            margin-bottom: 5px;
+            color: #666;
+            font-weight: bold;
+        }
+        input, textarea { 
+            width: 100%; 
+            padding: 8px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        input[readonly], textarea[readonly] { 
+            background-color: #f0f0f0;
+            cursor: not-allowed;
+        }
+        textarea {
+            resize: none;
+        }
+        button {
+            background: #3498db; 
+            color: white; 
+            border: none;
+            padding: 10px 20px; 
+            border-radius: 4px; 
+            cursor: pointer;
+            transition: background 0.3s;
+            margin: 5px 0;
+        }
+        button:hover { 
+            background: #2980b9; 
+        }
+        #verifyResult { 
+            padding: 10px; 
+            margin-top: 10px; 
+            border-radius: 4px; 
+            text-align: center;
+        }
+        .success { 
+            background: #2ecc71; 
+            color: white; 
+        }
+        .error { 
+            background: #e74c3c; 
+            color: white; 
+        }
+        #toggleDisplay {
+            position: absolute;
+            top: 20px;
+            left: 210px;
+            width: 160px;
+            z-index: 1;
+            white-space: normal;
+            text-align: center;
+            line-height: 1.2;
+        }
+        #user_count {
+            width: calc(100% - 120px);
+        }
+        #generateButton {
+            position: absolute;
+            top: 20px;
+            right: 0;
+            width: 100px;
+        }
+        .coordinate-group {
+            margin-bottom: 10px;
+        }
+        .coordinate-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="control-panel">
+            <h2>控制面板</h2>
+            
+            <div class="input-group">
+                <label>参与方数量 （m）：</label>
+                <input type="number" id="user_count" min="1" value="3">
+                <button id="generateButton" onclick="generateBlocks()">确定</button>
+            </div>
+
+            <div class="input-group">
+                <button onclick="initSystem()">初始化系统参数</button>
+                <button onclick="genGroupKey()">生成组公钥</button>
+                <div id="groupPublicKeyDisplay" class="param-block">
+                    <h3>最终组公钥</h3>
+                    <div class="input-group">
+                        <label>组公钥（group_x）</label>
+                        <textarea id="group_public_x" readonly class="hex-display" rows="2" style="resize: none;"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label>组公钥（group_y）</label>
+                        <textarea id="group_public_y" readonly class="hex-display" rows="2" style="resize: none;"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="input-group">
+                <label>消息内容：</label>
+                <input type="text" id="message" value="message digest">
+                <button onclick="signMessage()">生成签名</button>
+            </div>
+
+            <div class="input-group">
+                <label>签名结果：</label>
+                <div class="coordinate-group">
+                    <textarea id="sigR" placeholder="r值" readonly class="hex-display" rows="2" style="resize: none;"></textarea>
+                    <textarea id="sigS" placeholder="s值" readonly class="hex-display" rows="2" style="resize: none;"></textarea>
+                </div>
+                <button onclick="verifySignature()">验证签名</button>
+                <div id="verifyResult"></div>
+            </div>
+        </div>
+
+        <!-- 切换进制按钮 -->
+        <button id="toggleDisplay" onclick="toggleDisplay()">切换显示进制<br>（当前：十六进制）</button>
+
+        <div class="param-container" id="paramBlocks">
+            <!-- 动态生成的参数块 -->
+        </div>
+    </div>
+
+    <script>
+        let currentUserCount = 3;
+        let isHex = true;
+
+        function toggleDisplay() {
+            isHex = !isHex;
+            const button = document.getElementById('toggleDisplay');
+            button.innerHTML = `切换显示进制<br>（当前：${isHex ? '十六进制' : '十进制'}）`;
+            
+            document.querySelectorAll('.hex-display').forEach(input => {
+                const hexValue = input.dataset.hex;
+                if (hexValue) {
+                    input.value = isHex ? hexValue : BigInt('0x' + hexValue).toString();
+                }
+            });
+        }
+
+        function generateBlocks() {
+            currentUserCount = parseInt(document.getElementById('user_count').value);
+            let html = `
+                <div class="param-block">
+                    <h3>服务器参数</h3>
+                    <div class="input-group">
+                        <label>私钥（d）</label>
+                        <input id="server_private" readonly class="hex-display">
+                    </div>
+                    <div class="input-group">
+                        <label>公钥（P_x）</label>
+                        <input id="server_px" readonly class="hex-display">
+                    </div>
+                    <div class="input-group">
+                        <label>公钥（P_y）</label>
+                        <input id="server_py" readonly class="hex-display">
+                    </div>
+                </div>`;
+
+            for (let i = 0; i < currentUserCount; i++) {
+                html += `
+                <div class="param-block">
+                    <h3>参与方 ${i+1}</h3>
+                    <div class="input-group">
+                        <label>ID</label>
+                        <input id="user${i}_id" value="User_${i+1}">
+                    </div>
+                    <div class="input-group">
+                        <label>私钥（d）</label>
+                        <input id="user${i}_private" readonly class="hex-display">
+                    </div>
+                    <div class="input-group">
+                        <label>公钥（P_x）</label>
+                        <input id="user${i}_px" readonly class="hex-display">
+                    </div>
+                    <div class="input-group">
+                        <label>公钥（P_y）</label>
+                        <input id="user${i}_py" readonly class="hex-display">
+                    </div>
+                    <div class="input-group">
+                        <label>共享组公钥（P_group_x）</label>
+                        <input id="user${i}_group_x" readonly class="hex-display">
+                    </div>
+                    <div class="input-group">
+                        <label>共享组公钥（P_group_y）</label>
+                        <input id="user${i}_group_y" readonly class="hex-display">
+                    </div>
+                    <div class="input-group">
+                        <label>随机点（KG_x）</label>
+                        <input id="user${i}_KG_x" readonly class="hex-display">
+                    </div>
+                    <div class="input-group">
+                        <label>随机点（KG_y）</label>
+                        <input id="user${i}_KG_y" readonly class="hex-display">
+                    </div>
+                </div>`;
+            }
+
+            document.getElementById('paramBlocks').innerHTML = html;
+        }
+
+        // async function postData(url, data) {
+        //     try {
+        //         const response = await fetch(url, {
+        //             method: 'POST',
+        //             headers: { 'Content-Type': 'application/json' },
+        //             body: JSON.stringify(data)
+        //         });
+
+        //         // 克隆 Response 对象
+        //         const clonedResponse = response.clone();
+
+        //         // 打印原始响应数据
+        //         const rawResponse = await clonedResponse.text();
+        //         console.log('Raw response:', rawResponse);
+
+        //         // 检查响应状态码
+        //         if (!response.ok) {
+        //             const error = await response.json();
+        //             throw new Error(error.error || '请求失败');
+        //         }
+
+        //         // 解析 JSON 响应体并返回
+        //         return await response.json();
+        //     } catch (error) {
+        //         showMessage(`错误: ${error.message}`, 'error');
+        //         throw error;
+        //     }
+        // }
+
+        async function postData(url, data) {
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                // 检查响应状态码
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || '请求失败');
+                }
+
+                return await response.json();
+            } catch (error) {
+                showMessage(`错误: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        function showMessage(message, type = 'success') {
+            const el = document.getElementById('verifyResult');
+            el.textContent = message;
+            el.className = type;
+        }
+
+        async function initSystem() {
+            if (!currentUserCount) {
+                alert("请先设置参与方数量");
+                return;
+            }
+
+            try {
+                const res = await postData('http://localhost:8888/init', { user_count: currentUserCount });
+
+                // 更新服务器参数
+                const server = res.server;
+                const setValue = (id, value) => {
+                    const el = document.getElementById(id);
+                    el.dataset.hex = value;
+                    el.value = isHex ? value : BigInt('0x' + value).toString();
+                };
+
+                setValue('server_private', server.private);
+                setValue('server_px', server.px);
+                setValue('server_py', server.py);
+
+                // 更新用户参数
+                res.users.forEach((user, index) => {
+                    setValue(`user${index}_private`, user.private);
+                    setValue(`user${index}_px`, user.px);
+                    setValue(`user${index}_py`, user.py);
+                });
+
+                showMessage('系统初始化成功！');
+            } catch (error) {
+                console.error('初始化失败:', error);
+            }
+        }
+
+        async function genGroupKey() {
+            try {
+                const res = await postData('http://localhost:8888/gen-group-key', { user_count: currentUserCount });
+                
+                const setValue = (id, value) => {
+                    const el = document.getElementById(id);
+                    el.dataset.hex = value;
+                    el.value = isHex ? value : BigInt('0x' + value).toString();
+                };
+
+                res.users.forEach((user, index) => {
+                    setValue(`user${index}_group_x`, user.group_public_x);
+                    setValue(`user${index}_group_y`, user.group_public_y);
+                });
+
+                // 显示最终组公钥
+                setValue('group_public_x', res.group_public.x);
+                setValue('group_public_y', res.group_public.y);
+
+                showMessage('组公钥生成成功！');
+            } catch (error) {
+                console.error('生成组公钥失败:', error);
+            }
+        }
+
+        async function signMessage() {
+            const message = document.getElementById('message').value;
+            if (!message) {
+                showMessage('请输入消息内容', 'error');
+                return;
+            }
+
+            showMessage('正在生成签名...');
+            try {
+                const res = await postData('http://localhost:8888/sign', { message });
+                
+                const setValue = (id, value) => {
+                    const el = document.getElementById(id);
+                    el.dataset.hex = value;
+                    el.value = isHex ? value : BigInt('0x' + value).toString();
+                };
+
+                res.kg.forEach((kg, index) => {
+                    setValue(`user${index}_KG_x`, kg.x);
+                    setValue(`user${index}_KG_y`, kg.y);
+                });
+
+                setValue('sigR', res.r);
+                setValue('sigS', res.s);
+                showMessage('签名生成成功！');
+            } catch (error) {
+                console.error('签名失败:', error);
+            }
+        }
+
+        async function verifySignature() {
+            let r = document.getElementById('sigR').value;
+            let s = document.getElementById('sigS').value;
+            const message = document.getElementById('message').value;
+
+            if (!r || !s) {
+                showMessage('请先生成签名', 'error');
+                return;
+            }
+
+            try {
+                // 转换为十六进制
+                if (!isHex) {
+                    r = BigInt(r).toString(16);
+                    s = BigInt(s).toString(16);
+                }
+
+                const res = await postData('http://localhost:8888/verify', { message, r, s });
+                showMessage(res.valid ? '验签通过' : '验签失败', 
+                          res.valid ? 'success' : 'error');
+            } catch (error) {
+                console.error('验证失败:', error);
+            }
+        }
+    </script>
+</body>
+</html>
