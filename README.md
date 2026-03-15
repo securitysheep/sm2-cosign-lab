@@ -105,7 +105,6 @@ docs/
   api.md
   architecture.md
   github-publish-guide.md
-  manual/
 scripts/
   regression_sm2_flow.sh
 src/
@@ -129,7 +128,6 @@ src/
 - API 文档: [docs/api.md](docs/api.md)
 - 架构文档: [docs/architecture.md](docs/architecture.md)
 - 发布指南: [docs/github-publish-guide.md](docs/github-publish-guide.md)
-- 协同签名模块化重构计划: [docs/plans/2026-03-14-backend-modularization.md](docs/plans/2026-03-14-backend-modularization.md)
 
 ## 开发路线图
 
